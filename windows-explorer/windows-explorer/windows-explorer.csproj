@@ -15,4 +15,10 @@
     <None Remove="Core\Helpers\**" />
   </ItemGroup>
 
+  <!-- Add this to copy files to output directory -->
+  <ItemGroup>
+    <None Include="run-windows-explorer.bat" CopyToOutputDirectory="Always" />      
+    <None Include="wwwroot\**" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+
 </Project>
