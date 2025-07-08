@@ -1,1 +1,1 @@
-windows-explorer.exe --wwwrootpath=.\wwwroot
+windows-explorer.exe --wwwrootpath=.\wwwroot 

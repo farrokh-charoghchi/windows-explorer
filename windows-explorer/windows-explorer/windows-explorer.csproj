@@ -17,8 +17,8 @@
 
   <!-- Add this to copy files to output directory -->
   <ItemGroup>
-    <None Include="run-windows-explorer.bat" CopyToOutputDirectory="Always" />      
-    <None Include="wwwroot\**" CopyToOutputDirectory="Always" />
+    <None Include="run-windows-explorer.bat" CopyToOutputDirectory="PreserveNewest" />      
+    <None Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
