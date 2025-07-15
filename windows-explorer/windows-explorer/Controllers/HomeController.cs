@@ -48,6 +48,16 @@ namespace windows_explorer.Controllers
 
         public static IDictionary<string, string> mappings = new FileExtensionContentTypeProvider().Mappings;
 
+        public IActionResult Open(string fileItem)
+        {
+            PathInfoResult fileinfo = System.Text.Json.JsonSerializer.Deserialize<PathInfoResult>(fileItem);
+            if (!string.IsNullOrEmpty(fileinfo?.key))
+            {
+                return new ResumableFileStreamResult2(new System.IO.FileStream(fileinfo.key, System.IO.FileMode.Open, FileAccess.Read), mappings[fileinfo.key.Substring(fileinfo.key.LastIndexOf('.'))]);
+            }
+            throw new Exception("OpnFile ERROR!");
+        }
+
         private IActionResult DownloadFile(PathInfo? pathArgs)
         {
             if (pathArgs.pathInfoList != null)
@@ -77,6 +87,23 @@ namespace windows_explorer.Controllers
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
 
+        public IActionResult Test()
+        {
+            return Json(new
+            {
+                GetDisplayUrl = Request.GetDisplayUrl()
+                    .TrimStart("https://".ToCharArray())
+                    .TrimStart("http://".ToCharArray()),
+                Request.Host,
+                Request.Path,
+                Request.PathBase,
+                Request.Protocol,
+                Request.Query,
+                Request.QueryString,
+                URL= (Request.IsHttps ? "https://" : "http://") + Request.Host.Value
+             });
+        }
+
         private IActionResult GetDirContents(PathInfo? pathArgs)
         {
             if (pathArgs.pathInfo.Count < 1)
@@ -85,61 +112,20 @@ namespace windows_explorer.Controllers
             }
             return GetDirectoryInfo(pathArgs);
 
-            //arguments: {"pathInfo":[{"key":"Folder1","name":"Folder1"}]}
-            List<object> res = new List<object>();
-            res.Add(new
-            {
-                key = "Folder1",
-                name = "Folder1",
-                dateModified = "2025-07-02T20:22:59.6911492Z",
-                isDirectory = true,
-                size = 2409765000,
-                hasSubDirectories = true
-                //thumbnail = "/fileicon?type=jpg",
-            });
-            res.Add(new
-            {
-                key = "MyFile.jpg",
-                name = "MyFile.jpg",
-                dateModified = "2025-07-02T20:22:59.6911492Z",
-                isDirectory = false,
-                size = 1024,
-                hasSubDirectories = false
-                //thumbnail = "/fileicon?type=jpg",
-            });
-            res.Add(new
-            {
-                key = "MyFile2.mp4",
-                name = "MyFile2.mp4",
-                dateModified = "2025-07-02T20:22:59.6911492Z",
-                isDirectory = false,
-                size = 1024123456,
-                hasSubDirectories = false,
-                //thumbnail = "https://www.citypng.com/public/uploads/preview/yellow-computer-folder-icon-download-png-7017516950339154cbr0m5roh.png",
-            });
-            //{"key":"cldr-data","name":"cldr-data","dateModified":"2025-07-02T16:01:56.4536709Z","isDirectory":true,"size":0,"hasSubDirectories":true}
-
-            return Json(new
-            {
-                success = true,
-                errorCode = 0,
-                errorText = "",
-                result = res
-            });
+            
         }
 
         private IActionResult GetDirectoryInfo(PathInfo pathArgs)
         {
             List<PathInfoResult> res = new List<PathInfoResult>();
             System.IO.DirectoryInfo dirInfo = new System.IO.DirectoryInfo(pathArgs.pathInfo.Last().key + "\\");
-            res = dirInfo.GetDirectories().Select(d => new PathInfoResult
+            res = dirInfo.GetDirectories().Select(dir => new PathInfoResult
             {
-                name = d.Name.TrimEnd('\\'),
-                key = pathArgs.pathInfo.Last().key + "\\" + d.Name.TrimEnd('\\'),
+                name = dir.Name.TrimEnd('\\'),
+                key = pathArgs.pathInfo.Last().key + "\\" + dir.Name.TrimEnd('\\'),
                 size = 0,
                 isDirectory = true,
-                //hasSubDirectories = new System.IO.DirectoryInfo(d.FullName).GetDirectories().Count() > 0,
-                dateModified = "2025-07-02T16:01:56.4536709Z"
+                dateModified = dir.LastWriteTimeUtc.ToLocalTime().ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFFZ") //"2025-07-02T16:01:56.4536709Z"
             }).ToList();
 
 
@@ -158,14 +144,18 @@ namespace windows_explorer.Controllers
             });
 
 
-            res.AddRange(dirInfo.GetFiles().Select(f => new PathInfoResult
+            string WebsiteRootUrlAddress = (Request.IsHttps ? "https://" : "http://") + Request.Host.Value;
+            
+
+            res.AddRange(dirInfo.GetFiles().Select(file => new PathInfoResult
             {
-                name = f.Name.TrimEnd('\\'),
-                key = pathArgs.pathInfo.Last().key + "\\" + f.Name.TrimEnd('\\'),
-                size = f.Length,
+                name = file.Name.TrimEnd('\\'),
+                key = pathArgs.pathInfo.Last().key + "\\" + file.Name.TrimEnd('\\'),
+                size = file.Length,
                 isDirectory = false,
                 hasSubDirectories = false,
-                dateModified = "2025-07-02T16:01:56.4536709Z"
+                thumbnail =  WebsiteRootUrlAddress + "/FileIcon?type=" + file.Name.Substring(file.Name.LastIndexOf('.') + 1),
+                dateModified = file.LastWriteTimeUtc.ToLocalTime().ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFFZ") //"2025-07-02T16:01:56.4536709Z"
             }).ToList());
 
             return Json(new DevFileManagerResult<List<PathInfoResult>> { result = res });

@@ -8,13 +8,6 @@
 <script>
     $(document).ready(()=>{
 
-
-        @* const provider = new DevExpress.FileProviders.WebApi({
-            endpointUrl: 'home/file-manager-file-system',
-            //thumbnailExpr: "icon",
-            // ...
-        }); *@
-
         @if(ViewData["ver"]=="1"){
             <text>
             const provider = new DevExpress.fileManagement.RemoteFileSystemProvider({
@@ -30,10 +23,7 @@
             });
             </text>
         }
-        @* const provider = new DevExpress.fileManagement.RemoteFileSystemProvider({
-            endpointUrl: 'https://js.devexpress.com/Demos/NetCore/api/file-manager-file-system',
-            //endpointUrl: 'home/file-manager-file-system',
-        }); *@
+        
 
         $('#dv_file_manager').dxFileManager({
             name: 'fileManager',
@@ -48,8 +38,24 @@
                 rename: true,
                 upload: true 
             },
+            onSelectedFileOpened(e) {
+                console.log(e);
+                openFile(e?.file?.dataItem)
+                //const popup = $('#photo-popup').dxPopup('instance');
+                //popup.option({
+                //    title: e.file.name,
+                //    contentTemplate: `<img src="${e.file.dataItem.url}" class="photo-popup-image" />`,
+                //});
+                //popup.show();
+            },
             //allowedFileExtensions: ['.js', '.json', '.css'],
         });
+
+        const openFile = function(fileItem){
+            if(fileItem){
+                window.open('/home/open?fileItem=' + JSON.stringify({key: fileItem.key}),'_blank');
+            }
+        }
     });
 </script>
 }
