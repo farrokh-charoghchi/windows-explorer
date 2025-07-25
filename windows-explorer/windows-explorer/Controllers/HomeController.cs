@@ -26,55 +26,6 @@ namespace windows_explorer.Controllers
             return View();
         }
 
-        [Route("/home/file-manager-file-system")]
-        [AcceptVerbs("get", "post")]
-        public IActionResult fileManagerFileSystem(string command, string arguments, string _)
-        {
-            var pathArgs = System.Text.Json.JsonSerializer.Deserialize<PathInfo>(arguments);
-
-            switch (command) 
-            { 
-                case "GetDirContents":
-                    return GetDirContents(pathArgs);
-                    break;
-                case "Download":
-                    return DownloadFile(pathArgs);
-                    break;
-            default:
-                break;
-            }
-            throw new Exception("fileManagerFileSystem ERROR!");
-        }
-
-        public static IDictionary<string, string> mappings = new FileExtensionContentTypeProvider().Mappings;
-
-        public IActionResult Open(string fileItem)
-        {
-            PathInfoResult fileinfo = System.Text.Json.JsonSerializer.Deserialize<PathInfoResult>(fileItem);
-            if (!string.IsNullOrEmpty(fileinfo?.key))
-            {
-                return new ResumableFileStreamResult2(new System.IO.FileStream(fileinfo.key, System.IO.FileMode.Open, FileAccess.Read), mappings[fileinfo.key.Substring(fileinfo.key.LastIndexOf('.'))]);
-            }
-            throw new Exception("OpnFile ERROR!");
-        }
-
-        private IActionResult DownloadFile(PathInfo? pathArgs)
-        {
-            if (pathArgs.pathInfoList != null)
-            {
-                if (pathArgs.pathInfoList.Count == 1)
-                {
-                    var fileItem = pathArgs.pathInfoList[0].Last();
-                    // download one file
-                    return File(new System.IO.FileStream(fileItem.key, System.IO.FileMode.Open), mappings[fileItem.name.Substring(fileItem.name.LastIndexOf('.'))], fileItem.name);
-                }
-                else if (pathArgs.pathInfoList.Count > 1)
-                {
-                    // download multiple file as zip
-                }
-            }
-            throw new Exception("Download ERROR!");
-        }
 
         public IActionResult Privacy()
         {
@@ -100,20 +51,264 @@ namespace windows_explorer.Controllers
                 Request.Protocol,
                 Request.Query,
                 Request.QueryString,
-                URL= (Request.IsHttps ? "https://" : "http://") + Request.Host.Value
-             });
+                URL = (Request.IsHttps ? "https://" : "http://") + Request.Host.Value
+            });
         }
 
-        private IActionResult GetDirContents(PathInfo? pathArgs)
+
+
+
+        [Route("/home/file-manager-file-system")]
+        [AcceptVerbs("get", "post")]
+        public IActionResult fileManagerFileSystem(string command, string arguments, string _)
         {
+            var pathArgs = System.Text.Json.JsonSerializer.Deserialize<PathInfo>(arguments);
+
+            try
+            {
+                switch (command)
+                {
+                    case "GetDirContents":
+                        return GetDirContents(arguments);
+                        break;
+                    case "Download":
+                        return DownloadFile(arguments);
+                        break;
+                    case "CreateDir":
+                        return CreateDir(arguments);
+                        break;
+                    case "Rename":
+                        return Rename(arguments);
+                        break;
+                    case "Remove":
+                        return Remove(arguments);
+                        break;
+                    case "Copy":
+                        return Copy(arguments);
+                        break;
+                    case "Move":
+                        return Move(arguments);
+                        break;
+                    default:
+                        break;
+                }
+                throw new Exception("fileManagerFileSystem ERROR!");
+            }
+            catch (Exception ex)
+            {
+                return Json(new DevFileManagerResult<List<string>> 
+                { 
+                    success = false,
+                    errorText = ex.Message,
+                    result = [] 
+                });
+            }
+        }
+
+        private IActionResult Move(string arguments)
+        {
+            var model = System.Text.Json.JsonSerializer.Deserialize<CopyMoveVM>(arguments);
+            var srcItem = model.sourcePathInfo.LastOrDefault();
+            var destItem = model.destinationPathInfo.LastOrDefault();
+
+
+            if (srcItem != null && destItem != null)
+            {
+                if (model.sourceIsDirectory)
+                {
+                    System.IO.Directory.Move(srcItem.key, destItem.key + "\\" + srcItem.name);
+                }
+                else
+                {
+                    System.IO.File.Move(srcItem.key, destItem.key + "\\" + srcItem.name);
+                }
+            }
+            else
+            {
+                if (srcItem == null)
+                {
+                    throw new Exception("Move ERROR: source not defined!"); 
+                }
+                else
+                {
+                    throw new Exception("Move ERROR: destination not defined!");
+                }
+            }
+
+
+            return Json(new DevFileManagerResult<List<string>> { result = [] });
+        }
+
+        private IActionResult Copy(string arguments)
+        {
+            var model = System.Text.Json.JsonSerializer.Deserialize<CopyMoveVM>(arguments);
+            var srcItem = model.sourcePathInfo.LastOrDefault();
+            var destItem = model.destinationPathInfo.LastOrDefault();
+
+            if (srcItem != null && destItem != null)
+            {
+                if (model.sourceIsDirectory)
+                {
+                    string sourcePath = srcItem.key;
+                    string targetPath = destItem.key + "\\" + srcItem.name;
+
+                    try
+                    {
+                        System.IO.Directory.CreateDirectory(targetPath);
+                    }
+                    catch (Exception ex) { }
+
+                    //Now Create all of the directories
+                    foreach (string dirPath in Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories))
+                    {
+                        System.IO.Directory.CreateDirectory(dirPath.Replace(sourcePath, targetPath));
+                    }
+
+                    //Copy all the files & Replaces any files with the same name
+                    foreach (string newPath in Directory.GetFiles(sourcePath, "*.*", SearchOption.AllDirectories))
+                    {
+                        System.IO.File.Copy(newPath, newPath.Replace(sourcePath, targetPath), true);
+                    }
+                }
+                else
+                {
+                    System.IO.File.Copy(srcItem.key, destItem.key + "\\" + srcItem.name);
+                }
+            }
+            else
+            {
+                if (srcItem == null)
+                {
+                    throw new Exception("Copy ERROR: source not defined!");
+                }
+                else
+                {
+                    throw new Exception("Copy ERROR: destination not defined!");
+                }
+            }
+
+            return Json(new DevFileManagerResult<List<string>> { result = [] });
+        }
+
+        private IActionResult Remove(string arguments)
+        {
+            var model = System.Text.Json.JsonSerializer.Deserialize<RemoveVM>(arguments);
+            var dirItem = model.pathInfo.LastOrDefault();
+
+            if (dirItem != null)
+            {
+                if (model.isDirectory)
+                {
+                    System.IO.Directory.Delete(dirItem.key, true);
+                }
+                else
+                {
+                    System.IO.File.Delete(dirItem.key);
+                }
+            }
+            else
+            {
+                throw new Exception("Remove ERROR: Location unknown!");
+            }
+
+            return Json(new DevFileManagerResult<List<string>> { result = [] });
+        }
+
+        private IActionResult Rename(string arguments)
+        {
+            var model = System.Text.Json.JsonSerializer.Deserialize<RenameVM>(arguments);
+            var dirItem = model.pathInfo.LastOrDefault();
+            if (dirItem != null)
+            {
+                if (model.isDirectory)
+                {
+                    string NewFolderPath = dirItem.key.Substring(0, dirItem.key.LastIndexOf('\\'))+ "\\" + model.name;
+                    System.IO.Directory.Move(dirItem.key, NewFolderPath);
+                }
+                else
+                {
+                    string NewFilePath = dirItem.key.Substring(0, dirItem.key.LastIndexOf('\\')) + "\\" + model.name;
+                    System.IO.File.Move(dirItem.key, NewFilePath);
+                }
+            }
+            else
+            {
+                throw new Exception("Rename ERROR: Location unknown!");
+            }
+
+            return Json(new DevFileManagerResult<List<string>> { result = [] });
+        }
+
+        private IActionResult CreateDir(string arguments)
+        {
+            var model = System.Text.Json.JsonSerializer.Deserialize<CreateDirVM>(arguments);
+            var dirItem = model.pathInfo.LastOrDefault();
+            if (dirItem != null)
+            {
+                System.IO.Directory.CreateDirectory(dirItem.key + "\\" + model.name);
+            }
+            else
+            {
+                throw new Exception("CreateDir ERROR: Location unknown!");
+            }
+
+            return Json(new DevFileManagerResult<List<string>> { result = [] });
+        }
+
+        private IActionResult GetDirContents(string arguments)
+        {
+            var pathArgs = System.Text.Json.JsonSerializer.Deserialize<PathInfo>(arguments);
             if (pathArgs.pathInfo.Count < 1)
             {
                 return GetSystemDrives();
             }
             return GetDirectoryInfo(pathArgs);
 
-            
+
         }
+
+        private IActionResult DownloadFile(string arguments)
+        {
+            var pathArgs = System.Text.Json.JsonSerializer.Deserialize<PathInfo>(arguments);
+            if (pathArgs.pathInfoList != null)
+            {
+                if (pathArgs.pathInfoList.Count == 1)
+                {
+                    var fileItem = pathArgs.pathInfoList[0].Last();
+                    // download one file
+                    return File(new System.IO.FileStream(fileItem.key, System.IO.FileMode.Open), mappings[fileItem.name.Substring(fileItem.name.LastIndexOf('.'))], fileItem.name);
+                }
+                else if (pathArgs.pathInfoList.Count > 1)
+                {
+                    // download multiple file as zip
+                    throw new Exception("Download multiple file not supported yet!");
+                }
+                else
+                {
+                    throw new Exception("Download ERROR: no file selected to download!");
+                }
+            }
+            throw new Exception("Download ERROR!");
+        }
+
+        
+
+        public static IDictionary<string, string> mappings = new FileExtensionContentTypeProvider().Mappings;
+
+        public IActionResult Open(string fileItem)
+        {
+            PathInfoResult fileinfo = System.Text.Json.JsonSerializer.Deserialize<PathInfoResult>(fileItem);
+            if (!string.IsNullOrEmpty(fileinfo?.key))
+            {
+                return new ResumableFileStreamResult2(new System.IO.FileStream(fileinfo.key, System.IO.FileMode.Open, FileAccess.Read), mappings[fileinfo.key.Substring(fileinfo.key.LastIndexOf('.'))]);
+            }
+            throw new Exception("OpnFile ERROR!");
+        }
+
+        
+
+
+        
 
         private IActionResult GetDirectoryInfo(PathInfo pathArgs)
         {
