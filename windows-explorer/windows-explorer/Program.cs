@@ -15,6 +15,7 @@ namespace windows_explorer
     public class Program
     {
         public static List<string> ipList = new List<string>();
+        public static string UploadTempFolder = "";
         public static void Main(string[] args)
         {
             var hostBuilder = CreateHostBuilder(args).Build();
@@ -41,6 +42,8 @@ namespace windows_explorer
 
             return host.ConfigureWebHostDefaults(webBuilder =>
                 {
+                    UploadTempFolder = config.GetSection("UploadTempFolder").Value.TrimEnd('\\') + "\\";
+
 
                     var hostName = System.Net.Dns.GetHostName();
                     var ips = System.Net.Dns.GetHostAddresses(hostName).Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);

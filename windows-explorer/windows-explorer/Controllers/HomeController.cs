@@ -89,6 +89,9 @@ namespace windows_explorer.Controllers
                     case "Move":
                         return Move(arguments);
                         break;
+                    case "UploadChunk":
+                        return UploadChunk(arguments);
+                        break;
                     default:
                         break;
                 }
@@ -103,6 +106,64 @@ namespace windows_explorer.Controllers
                     result = [] 
                 });
             }
+        }
+
+        private IActionResult UploadChunk(string arguments)
+        {
+            if (!System.IO.Directory.Exists(Program.UploadTempFolder))
+            {
+                System.IO.Directory.CreateDirectory(Program.UploadTempFolder);
+            }
+
+            var model = System.Text.Json.JsonSerializer.Deserialize<UploadChunkVM>(arguments);
+            var dirItem = model.destinationPathInfo.LastOrDefault();
+            if (dirItem == null)
+            {
+                throw new Exception("Upload ERROR: Location unknown!");
+            }
+
+            // proccess uploading chunks
+            string tempChunkFileName = model.chunkMetadataModel?.UploadId + "__" + model.chunkMetadataModel.Index.ToString();
+
+            var requestFileStream = Request.Form.Files[0].OpenReadStream();
+            requestFileStream.Seek(0, System.IO.SeekOrigin.Begin);
+
+            var tempChunkFileStream =  System.IO.File.OpenWrite(Program.UploadTempFolder + tempChunkFileName);
+            requestFileStream.CopyTo(tempChunkFileStream);
+            tempChunkFileStream.Close();
+            tempChunkFileStream.Dispose();
+
+            var uploadedChunks = System.IO.Directory.GetFiles(Program.UploadTempFolder, model.chunkMetadataModel?.UploadId + "*");
+
+            if (uploadedChunks.Length >= model.chunkMetadataModel.TotalCount)
+            {
+                // All chunks uploaded, now create final file
+
+                string finalFilePath = dirItem.key + "\\" + model.chunkMetadataModel.FileName;
+                int fileExistsCount = 1;
+                while (System.IO.File.Exists(finalFilePath))
+                {
+                    finalFilePath = dirItem.key + "\\" + model.chunkMetadataModel.FileName.Substring(0, model.chunkMetadataModel.FileName.LastIndexOf('.')) + "(" +(++fileExistsCount).ToString() + ")" + model.chunkMetadataModel.FileName.Substring(model.chunkMetadataModel.FileName.LastIndexOf('.'));
+                }
+
+                var finalFileStream = System.IO.File.OpenWrite(finalFilePath);
+
+                for (var i = 0; i < model.chunkMetadataModel.TotalCount; i++)
+                {
+                    string chunkFileName = Program.UploadTempFolder + model.chunkMetadataModel?.UploadId + "__" + i.ToString();
+                    var chunkFileStream = System.IO.File.OpenRead(chunkFileName);
+                    chunkFileStream.CopyTo(finalFileStream);
+                    chunkFileStream.Close();
+                    chunkFileStream.Dispose();
+
+                    System.IO.File.Delete(chunkFileName);
+                }
+                finalFileStream.Close();
+                finalFileStream.Dispose();
+            }
+
+
+            return Json(new DevFileManagerResult<List<string>> { result = [] });
         }
 
         private IActionResult Move(string arguments)

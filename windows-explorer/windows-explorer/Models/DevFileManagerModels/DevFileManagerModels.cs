@@ -61,4 +61,32 @@ namespace windows_explorer.Models.DevFileManagerModels
         public List<KeyName> destinationPathInfo { get; set; } = new List<KeyName>();
         public bool sourceIsDirectory { get; set; }
     }
+
+    public class UploadChunkVM
+    {
+        private ChunkMetadataVM _chunkMetadataModel = null;
+
+        public List<KeyName> destinationPathInfo { get; set; } = new List<KeyName>();
+        public string chunkMetadata { get; set; }
+        public ChunkMetadataVM chunkMetadataModel 
+        { 
+            get 
+            {
+                if (_chunkMetadataModel == null)
+                {
+                    _chunkMetadataModel = System.Text.Json.JsonSerializer.Deserialize<ChunkMetadataVM>(chunkMetadata);
+                }
+                return _chunkMetadataModel;
+            } 
+        }
+    }
+
+    public class ChunkMetadataVM
+    {
+        public string UploadId { get; set; }
+        public string FileName { get; set; }
+        public int Index { get; set; }
+        public int TotalCount { get; set; }
+        public long FileSize { get; set; }
+    }
 }
